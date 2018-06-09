@@ -109,7 +109,7 @@ CRGB leds[NUM_PIXELS];
 // uint32_t COLOUR_BLUE = leds.Color(0, 0, 255);
 // uint32_t COLOUR_PINK = leds.Color(128, 0, 100);
 // uint32_t COLOUR_ACCELERATING = COLOUR_BLUE;
-// uint32_t COLOUR_DECELERATING = COLOUR_PINK;
+// uint32_t COLOUR_BRAKING = COLOUR_PINK;
 // uint32_t COLOUR_THROTTLE_IDLE = COLOUR_GREEN;
 
 CRGB COLOUR_OFF = CRGB::Black;
@@ -119,7 +119,7 @@ CRGB COLOUR_BLUE = CRGB::Blue;
 CRGB COLOUR_PINK = CRGB::Pink;
 
 CRGB COLOUR_ACCELERATING = CRGB::Navy;
-CRGB COLOUR_DECELERATING = CRGB::Crimson;
+CRGB COLOUR_BRAKING = CRGB::Crimson;
 CRGB COLOUR_THROTTLE_IDLE = CRGB::Green;
 
 CRGB COLOUR_WHITE = CRGB::White;
@@ -205,16 +205,19 @@ volatile long lastPacketFromMaster = 0;
 
 Scheduler runner;
 
+#define FAST_FLASH_DURATION     300
+
 void tFastFlash_callback();
-Task tFastFlash(500, 1, &tFastFlash_callback);
+Task tFastFlash(FAST_FLASH_DURATION, 2, &tFastFlash_callback);
 void tFastFlash_callback() {
-    Serial.printf("tFastFlash_callback \n");
-    setPixels(COLOUR_OFF);
-    tFastFlash.disable();
+    if (tFastFlash.isLastIteration()) {
+        setPixels(COLOUR_OFF);
+        tFastFlash.disable();
+    }
 }
 
 void fastFlashLed() {
-    tFastFlash.setIterations(1);
+    tFastFlash.setIterations(2);
     tFastFlash.enable();
 }
 
@@ -246,8 +249,9 @@ void tSendControllerValues_callback() {
 		lastPacketFromMaster = millis();
 	}
 	updateOled = true;
-	debug.print(COMMUNICATION, "tSendControllerValues_callback(): batteryVoltage:%.1f \n", esk8.boardPacket.batteryVoltage);
+	debug.print(COMMUNICATION, "tSendControllerValues_callback(): batteryVoltage:%.1f lastPacketFromMaster: %ul \n", esk8.boardPacket.batteryVoltage, lastPacketFromMaster);
 }
+
 
 Task tSendControllerValues(SEND_TO_BOARD_INTERVAL_MS, TASK_FOREVER, &tSendControllerValues_callback);
 
@@ -269,7 +273,12 @@ void encoderInterruptHandler() {
 			debug.print(THROTTLE_DEBUG, "encoderCounter: %d, throttle: %d \n", encoderCounter, throttle);
 			statusChanged = true;
 
-            setPixels(COLOUR_ACCELERATING);
+            if (encoderCounter > 0) {
+                setPixels(COLOUR_ACCELERATING);
+            }
+            else {
+                setPixels(COLOUR_BRAKING);
+            }
             fastFlashLed();
 		}
 	}
@@ -282,7 +291,12 @@ void encoderInterruptHandler() {
 			debug.print(THROTTLE_DEBUG, "encoderCounter: %d, throttle: %d \n", encoderCounter, throttle);
 			statusChanged = true;
 
-            setPixels(COLOUR_DECELERATING);
+            if (encoderCounter > 0) {
+                setPixels(COLOUR_ACCELERATING);
+            }
+            else {
+                setPixels(COLOUR_BRAKING);
+            }
             fastFlashLed();
 		}
 	}
@@ -387,16 +401,14 @@ void setup() {
 	debug.addOption(THROTTLE_DEBUG, "THROTTLE_DEBUG");
 	debug.addOption(REGISTER, "REGISTER");
 
-	debug.setFilter(THROTTLE_DEBUG | REGISTER);	//DEBUG | STARTUP | COMMUNICATION | ERROR);
+    // debug.setFilter(STARTUP | THROTTLE_DEBUG | COMMUNICATION);	// DEBUG | STARTUP | COMMUNICATION | ERROR);
+    debug.setFilter(THROTTLE_DEBUG);	// DEBUG | STARTUP | COMMUNICATION | ERROR);
 
 	debug.print(STARTUP, "%s \n", compile_date);
+    debug.print(STARTUP, "Esk8 Controller/main.cpp \n");
 	debug.print(STARTUP, "NOTE: %s\n", boardSetup);
 
 	esk8.begin(&radio, role, radioNumber, &debug);
-
-	//FastLED.addLeds<TM1804, PIXEL_PIN, RGB>(leds, NUM_PIXELS);
-
-	// leds.begin();
 
 	FastLED.addLeds<NEOPIXEL, PIXEL_PIN>(leds, NUM_PIXELS);
 	FastLED.show();
@@ -507,37 +519,37 @@ void setCommsState(int newState) {
 	}
 }
 //--------------------------------------------------------------------------------
-void setStatusRegisterPixels() {
-
-	if (statusChanged == false) {
-		return;
-	}
-
-	debug.print(REGISTER, "setStatusRegisterPixels()");
-
-	if (commsState == COMMS_OFFLINE) {
-		setPixels(COLOUR_RED);
-	}
-	else if (encoderCounter > 0) {
-		setPixels(COLOUR_ACCELERATING);
-	}
-	else if (encoderCounter < 0) {
-		setPixels(COLOUR_DECELERATING);
-	}
-	else if (encoderCounter == 0) {
-		setPixels(COLOUR_GREEN);
-	}
-	else {
-		setPixels(COLOUR_OFF);
-	}
-
-	statusChanged = false;
-}
+// void setStatusRegisterPixels() {
+//
+// 	if (statusChanged == false) {
+// 		return;
+// 	}
+//
+// 	debug.print(REGISTER, "setStatusRegisterPixels()");
+//
+// 	if (commsState == COMMS_OFFLINE) {
+// 		setPixels(COLOUR_RED);
+// 	}
+// 	else if (encoderCounter > 0) {
+// 		setPixels(COLOUR_ACCELERATING);
+// 	}
+// 	else if (encoderCounter < 0) {
+// 		setPixels(COLOUR_BRAKING);
+// 	}
+// 	else if (encoderCounter == 0) {
+// 		setPixels(COLOUR_GREEN);
+// 	}
+// 	else {
+// 		setPixels(COLOUR_OFF);
+// 	}
+//
+// 	statusChanged = false;
+// }
 //--------------------------------------------------------------
 void setPixels(CRGB c) {
 	for (uint16_t i=0; i<NUM_PIXELS; i++) {
 		leds[i] = c;
-		// leds[i] /= 10;
+		leds[i] /= 10;
 	}
 	FastLED.show();
 }

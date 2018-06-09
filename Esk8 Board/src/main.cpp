@@ -1,10 +1,10 @@
 
 #include <SPI.h>
-#include "RF24.h"
+#include <RF24.h>
 #include <esk8Lib.h>
 
 #include <ESP8266VESC.h>
-#include "VescUart.h"
+#include <VescUart.h>
 #include "datatypes.h"
 #include <U8g2lib.h>
 #include <myPushButton.h>
@@ -15,6 +15,10 @@
 /*--------------------------------------------------------------------------------*/
 
 const char compile_date[] = __DATE__ " " __TIME__;
+
+void initOLED();
+bool getVescValues();
+void updateOLED(bool controllerOnline);
 
 //--------------------------------------------------------------------------------
 
