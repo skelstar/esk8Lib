@@ -1,0 +1,6 @@
+*.json
+*.DB
+*.dblite
+*.clang_complete
+*.elf
+*.url
